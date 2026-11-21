@@ -1,6 +1,6 @@
 """
 YOLOv8-seg gate + 5-fold UNet ensemble inference pipeline.
-Same models and main parameters as the paper version (YOLO conf 0.15, crop padding 40 px,
+Same models and main parameters as the main app (YOLO conf 0.15, crop padding 40 px,
 384x384 UNet input, OLP threshold 0.65, 200 px blob filter, 5-fold ensemble + flip TTA),
 factored into plain functions shared by the dashboard/new-case/case-detail pages.
 Simplified relative to the full app: no stricter fallback threshold when YOLO finds nothing
