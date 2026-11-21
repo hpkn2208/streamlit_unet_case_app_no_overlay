@@ -1,7 +1,10 @@
 """
 YOLOv8-seg gate + 5-fold UNet ensemble inference pipeline.
-Same models, thresholds, and logic as Stage3/streamlit_app/app.py, factored
-into plain functions shared by the dashboard/new-case/case-detail pages.
+Same models and main parameters as the paper version (YOLO conf 0.15, crop padding 40 px,
+384x384 UNet input, OLP threshold 0.65, 200 px blob filter, 5-fold ensemble + flip TTA),
+factored into plain functions shared by the dashboard/new-case/case-detail pages.
+Simplified relative to the full app: no stricter fallback threshold when YOLO finds nothing
+and no minimum-size filter for the "other lesion" class.
 """
 
 import logging
@@ -24,7 +27,7 @@ MODEL_DIR = Path(__file__).parent / "models"
 YOLO_PT = MODEL_DIR / "yolo_best.pt"
 UNET_DIR = MODEL_DIR / "unet_folds"
 N_FOLDS = 5
-IMG_SIZE = 256
+IMG_SIZE = 384
 NUM_CLASSES = 3
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -219,19 +222,19 @@ def _run_inference_impl(
     if yolo_boxes:
         for (x1, y1, x2, y2) in yolo_boxes:
             crop_rgb = img_rgb[y1:y2, x1:x2]
-            crop_256 = cv2.resize(crop_rgb, (IMG_SIZE, IMG_SIZE))
-            pred_256, probs_256 = predict_unet(unet_models, crop_256, lichen_thresh, use_tta, device)
-            pred_256 = remove_small_blobs(pred_256, min_blob_px)
-            probs_by_crop.append(probs_256)
+            crop_sq = cv2.resize(crop_rgb, (IMG_SIZE, IMG_SIZE))
+            pred_sq, probs_sq = predict_unet(unet_models, crop_sq, lichen_thresh, use_tta, device)
+            pred_sq = remove_small_blobs(pred_sq, min_blob_px)
+            probs_by_crop.append(probs_sq)
 
-            pred_crop = cv2.resize(pred_256, (x2 - x1, y2 - y1), interpolation=cv2.INTER_NEAREST)
+            pred_crop = cv2.resize(pred_sq, (x2 - x1, y2 - y1), interpolation=cv2.INTER_NEAREST)
             full_pred[y1:y2, x1:x2] = np.maximum(full_pred[y1:y2, x1:x2], pred_crop)
     else:
-        img_256 = cv2.resize(img_rgb, (IMG_SIZE, IMG_SIZE))
-        pred_256, probs_256 = predict_unet(unet_models, img_256, lichen_thresh, use_tta, device)
-        pred_256 = remove_small_blobs(pred_256, min_blob_px)
-        probs_by_crop.append(probs_256)
-        full_pred = cv2.resize(pred_256, (W, H), interpolation=cv2.INTER_NEAREST)
+        img_sq = cv2.resize(img_rgb, (IMG_SIZE, IMG_SIZE))
+        pred_sq, probs_sq = predict_unet(unet_models, img_sq, lichen_thresh, use_tta, device)
+        pred_sq = remove_small_blobs(pred_sq, min_blob_px)
+        probs_by_crop.append(probs_sq)
+        full_pred = cv2.resize(pred_sq, (W, H), interpolation=cv2.INTER_NEAREST)
 
     overlay_rgb = draw_overlay(img_rgb, cv2.resize(full_pred, (W, H), interpolation=cv2.INTER_NEAREST))
 

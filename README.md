@@ -17,7 +17,6 @@ Upload one or more intraoral photos for a patient, and the app runs a two-stage 
 | 🖼️ **Multi-image cases** | Upload a full set of photos per patient in one pass |
 | 🧠 **5-fold UNet ensemble** | EfficientNet-B0 encoder, softmax-averaged across folds + test-time augmentation |
 | 🩺 **Safety-first conclusions** | Case-level verdict prioritizes any *reliable* positive finding over normal readings elsewhere — a single confident lichen call isn't diluted by other normal images. Low-confidence findings (<50%) are explicitly flagged and can't decide the case alone |
-| 🎨 **Color-coded overlays** | Red / amber pixel overlays on the source image, toggleable against the original |
 | 📝 **Clinical notes** | Timestamped free-text notes per case |
 | ⚡ **Warm start** | The model loads once when the app boots, so the first analysis isn't stuck behind a cold load |
 | 🗑️ **One-click reset** | Guarded "danger zone" control to wipe all demo/pilot data |
@@ -41,7 +40,7 @@ Upload one or more intraoral photos for a patient, and the app runs a two-stage 
         per-pixel softmax → lichen / other / normal
                         │
                         ▼
-   overlay + area %  +  per-image label  +  confidence
+   per-image label  +  confidence
                         │
                         ▼
    case-level conclusion: most severe RELIABLE finding wins
@@ -54,8 +53,8 @@ Upload one or more intraoral photos for a patient, and the app runs a two-stage 
 ## Screens
 
 - **Dashboard** — case list with live stats (total / pending / lichen-positive), one click into any case
-- **New Case** — patient code + drag-and-drop multi-image upload, adjustable inference thresholds
-- **Case Detail** — per-image overlay/original toggle, confidence + area breakdown, conclusion reasoning, notes
+- **New Case** — patient code + drag-and-drop multi-image upload (inference thresholds are fixed in the code)
+- **Case Detail** — original photo per image, AI label + confidence, conclusion reasoning, notes (no segmentation overlay is shown in this variant)
 
 ---
 
@@ -63,11 +62,11 @@ Upload one or more intraoral photos for a patient, and the app runs a two-stage 
 
 ```bash
 git clone <this-repo>
-cd streamlit_case_app
+cd streamlit_unet_case_app_no_overlay
 pip install -r requirements.txt
 ```
 
-Drop your trained checkpoints into `models/` (see [Model weights](#model-weights) below), then:
+The model weights are already in `models/` (see [Model weights](#model-weights) below), then:
 
 ```bash
 streamlit run Dashboard.py
@@ -79,7 +78,7 @@ Open `http://localhost:8501`.
 
 ## Model weights
 
-Not included in this repo — supply your own trained checkpoints in this layout:
+Included in this repo (git, ~140 MB). To use your own checkpoints, replace them in this layout:
 
 ```
 models/
@@ -88,7 +87,7 @@ models/
     └── UNet_fold0_best.pth  …  UNet_fold4_best.pth   (5-fold cross-validation)
 ```
 
-Expects an EfficientNet-B0 encoder, 3-class output (normal / lichen / other), 256×256 input. Missing a few folds is fine — the ensemble just averages over whatever it finds.
+Expects an EfficientNet-B0 encoder, 3-class output (normal / lichen / other), 384×384 input. Missing a few folds is fine — the ensemble just averages over whatever it finds.
 
 ---
 
@@ -108,14 +107,14 @@ Runs on CPU on the free tier — a few seconds per image instead of ~1s on GPU. 
 ## Project structure
 
 ```
-streamlit_case_app/
+streamlit_unet_case_app_no_overlay/
 ├── Dashboard.py              # entry point — case list, stats, eager model load, danger zone
 ├── pages/
 │   ├── 1_New_Case.py         # upload + run inference
-│   └── 2_Case_Detail.py      # results, overlay toggle, notes
+│   └── 2_Case_Detail.py      # results, notes
 ├── pipeline.py                # YOLO gate + UNet ensemble, framework-agnostic
 ├── db.py                     # SQLite persistence — cases, images, detections, notes
-├── models/                   # your trained weights (see above)
+├── models/                   # trained weights (see above)
 ├── requirements.txt
 ├── packages.txt               # apt packages Streamlit Cloud needs (libGL, etc.)
 └── data/                     # created at runtime — SQLite DB + saved images (gitignored)
@@ -129,6 +128,13 @@ streamlit_case_app/
 - All data lives in `data/` — a local SQLite file plus original/overlay PNGs — created on first run and excluded from git
 - On Streamlit Community Cloud, `data/` does **not** survive a redeploy or app restart — this is a pilot/demo tool, not a system of record
 - No accounts, no authentication — anyone with the app URL can view and create cases
+
+---
+
+## License
+
+[GNU AGPL-3.0](LICENSE). The detector is built on [Ultralytics YOLO](https://github.com/ultralytics/ultralytics) (AGPL-3.0),
+so the code and the weights derived from it are released under the same license. Clinical images and patient data are not covered by this license and are not part of the repository.
 
 ---
 
